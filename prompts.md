@@ -48,3 +48,7 @@
   - (4) The gap above section 3 was reduced.
   - (5) The "limit L/360" label sat on the cantilever's deflection curve, so it moved to the left end, in the app too.
 - **Result:** Works. Sheets checked for the example beam (bending and deflection both FAIL) and for a W18×35 cantilever with two point loads plus a uniform load (bending PASS at 0.938, deflection FAIL at 1.071). That cantilever's tip deflection of 0.357 in matches superposition by hand (0.195 + 0.146 + 0.016). Validation reran: 50/50 pass.
+
+- **Asked:** Write a short README.md that says what this app does, which packages to install, and the command that starts it.
+- **Changed:** Added `README.md` (what the app does, `pip install numpy matplotlib`, `python app.py`, the Mac `python3` note, and `python validate.py`).
+- **Result:** Succeeded. Ready to publish to GitHub from VS Code (Publish Branch).
