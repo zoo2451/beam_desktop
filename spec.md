@@ -1,248 +1,166 @@
-# Beam Designer
+# Beam Designer (Desktop)
 
 ## 1. Purpose
 
-Create a clean, professional single-page beam-design tool that calculates reactions, shear,
-moment, bending stress, and elastic deflection for a beam. The app shall show the beam
-and loads, shear/moment/deflection diagrams, and pass/fail results for bending and
-deflection.
+A Python desktop app, built with Tkinter, that calculates reactions, shear, moment, bending stress, and elastic deflection for a single-span beam. It shows the beam and its loads, shear/moment/deflection diagrams, and pass/fail results for bending and deflection. It is for engineering students and engineers sizing a steel or lumber beam.
 
-The app shall open with a worked example beam already loaded.
+It is a port of the Beam Designer web app (`index.html`, kept in this folder as a reference for behavior). The app opens with a worked example beam already loaded and is started with `python app.py`.
 
-## 2. Supported beam types
+## 2. Platform
 
-- Simply supported beam: one pinned support and one roller support.
-- Cantilever beam: one fixed support at the left end.
+- Python 3.10 or newer, using Tkinter (part of the standard library) for the window and controls.
+- numpy for calculations; matplotlib, embedded in the window with `FigureCanvasTkAgg`, for the diagrams.
+- Runs on Windows and macOS (use `python3` on Macs where `python` is not Python 3).
+- A single source file, `app.py`. Calculation functions do not depend on Tkinter, so they can be tested without opening a window.
+- Results recalculate automatically whenever any input changes; no internet connection is needed.
 
-No other support types or continuous beams are supported.
+## 3. Supported beam types
 
-## 3. Coordinate and sign conventions
+- Simply supported beam: pin at x = 0 and roller at x = L.
+- Cantilever beam: fixed support at x = 0, free at x = L.
 
-- All horizontal coordinates originate at the left end of the beam.
-- Positive x is to the right.
-- Positive vertical loads act downward.
-- Positive reactions act upward.
-- Shear is defined as the sum of forces to the left of a section.
-- Positive moment is sagging (top in compression and bottom in tension).
+No other support types or continuous beams.
+
+## 4. Coordinate and sign conventions
+
+- x is measured from the left end of the beam; positive x is to the right.
+- Positive applied loads act downward; positive reactions act upward.
+- Shear V is the sum of forces to the left of a section (upward positive).
+- Positive moment M is sagging (top in compression, bottom in tension).
 - Positive deflection is downward.
-- Diagram plots shall state the sign convention and display units.
+- Each diagram states its sign convention and units.
 
-## 4. Units
+## 5. Units
 
-- Span and coordinate positions: feet (ft).
-- Point loads: kips (kip).
-- Distributed loads: kips per foot (kip/ft).
-- Section properties: inches (in), and section modulus \(S_x\) in \(in^3\).
-- Stress: ksi.
-- Modulus of elasticity: ksi.
-- Deflections: inches (in).
-- Internal moments: kip-ft for display.
-- Internal shear: kips.
+| Quantity | Unit |
+|---|---|
+| Span, positions | ft |
+| Point loads | kip |
+| Distributed loads | kip/ft |
+| Section modulus S<sub>x</sub> | in³ |
+| Moment of inertia I<sub>x</sub> | in⁴ |
+| E, stresses | ksi |
+| Shear | kip |
+| Moment | kip-ft (converted to kip-in for stress and deflection) |
+| Deflection | in |
 
-The app shall perform calculations internally using consistent units and shall convert
-feet to inches for deflection calculations. It shall not silently mix units.
+The app converts feet to inches for stress and deflection and never mixes units silently.
 
-## 5. Inputs
+## 6. Inputs
 
-### 5.1 Beam geometry
+| Input | Unit | Range / rule | Default | Control |
+|---|---|---|---|---|
+| Beam type | - | Simply supported or Cantilever | Simply supported | Dropdown |
+| Span L | ft | 0 < L ≤ 100 | 20 | Entry |
+| Material | - | Steel W-shape, Lumber, or Custom section | Steel W-shape | Dropdown |
+| Section | - | From the built-in tables (section 7) | W12 × 26 | Dropdown |
+| Allowable bending stress F<sub>b</sub> | ksi | > 0 | From the section table | Entry (editable) |
+| Custom S<sub>x</sub>, I<sub>x</sub>, E | in³, in⁴, ksi | each > 0 | 33.4, 204, 29000 | Entries (enabled only for Custom section) |
+| Deflection limit | - | L/180, L/240, L/360, L/480 | L/360 | Dropdown |
+| Point loads | kip, ft | P > 0; 0 ≤ a ≤ L | One load: 5 kip at 12 ft | Table with Add / Remove and editable cells |
+| Uniform loads | kip/ft, ft | w > 0; 0 ≤ start < end ≤ L | One load: 1 kip/ft from 0 to 20 ft | Table with Add / Remove and editable cells |
 
-- Beam type.
-- Total span in feet.
-- Span shall be greater than zero and at most 100 ft.
-- Coordinate values shall be within \(0 <= x <= L\).
+- At least one load is required.
+- Overlapping uniform loads are allowed and are added together.
+- Every field is checked before any result is calculated. An invalid field is highlighted, and a message explains the problem.
 
-### 5.2 Loads
+## 7. Materials and section properties
 
-The app shall allow point loads and uniform distributed loads.
+Section data is built into `app.py`, with its source noted.
 
-Point-load inputs shall include:
+- **Steel W-shapes** (AISC *Steel Construction Manual*, Table 1-1): W8×10, W10×12, W10×22, W12×26, W14×22, W14×30, W16×26, W18×35, W21×44, W24×55, with S<sub>x</sub>, I<sub>x</sub>, d, b<sub>f</sub>, and A. E = 29,000 ksi. The default F<sub>b</sub> = 24 ksi (≈ 0.66 F<sub>y</sub> for F<sub>y</sub> = 36 ksi, a simplified allowable-stress value that the user may edit).
+- **Lumber:** 2×10, 2×12, and 4×12 Douglas Fir-Larch No. 2.
+  - Properties use the actual dressed sizes (1.5 × 9.25, 1.5 × 11.25, and 3.5 × 11.25 in), with S = bd²/6 and I = bd³/12.
+  - Reference values come from the NDS Supplement: F<sub>b</sub> = 0.900 ksi and E = 1,600 ksi, used directly with no adjustment factors.
+  - Nominal sizes are never shown as actual dimensions.
+  - *Correction from the web app:* its 4×12 entry had S and I that do not match 3.5 × 11.25 in, and its lumber F<sub>b</sub> of 1.5 ksi exceeds the NDS reference value.
+- **Custom section:** the user enters S<sub>x</sub>, I<sub>x</sub>, E, and F<sub>b</sub>. These are labeled "user-entered, unverified."
 
-- Magnitude in kips.
-- Horizontal position in feet from the left end.
-- A downward load is entered as a positive magnitude.
+## 8. Calculations
 
-Uniform-load inputs shall include:
+### 8.1 Reactions (statics)
 
-- Magnitude in kip/ft.
-- Start position.
-- End position.
+With W = ΣP<sub>i</sub> + Σw<sub>j</sub>(e<sub>j</sub> − s<sub>j</sub>) and M<sub>0</sub> = ΣP<sub>i</sub>a<sub>i</sub> + Σw<sub>j</sub>(e<sub>j</sub> − s<sub>j</sub>)(s<sub>j</sub> + e<sub>j</sub>)/2 (the moment of the loads about x = 0):
 
-For uniform loads:
+- **Simply supported:** R<sub>R</sub> = M<sub>0</sub>/L and R<sub>L</sub> = W − R<sub>R</sub>.
+- **Cantilever:** R = W, and the fixed-end moment M<sub>fixed</sub> = −M<sub>0</sub> (hogging).
+- The app shows the equilibrium check ΣF<sub>y</sub> = R − W = 0.
 
-- Start shall be less than end.
-- Start and end shall be inside the beam span.
-- Overlapping uniform-load segments are allowed and shall be combined for calculations.
-- A downward uniform load is entered as a positive magnitude.
+### 8.2 Shear and moment
 
-At least one load shall be present. Supports, coordinate points, and load endpoints shall
-be validated before any result is calculated.
+- V(x) = R<sub>L</sub> − Σ<sub>a<sub>i</sub> ≤ x</sub> P<sub>i</sub> − Σ w<sub>j</sub> · (overlap of [s<sub>j</sub>, e<sub>j</sub>] with [0, x]).
+- M(x) is the moment of all forces to the left of x, including the fixed-end moment for a cantilever.
+- Values are computed on a grid of 2,000 intervals plus every load position, load endpoint, and support. Both sides of each point-load jump are included, and every point where V changes sign is added, so the maxima are exact.
+- Report the maximum |V| and the maximum |M|, each with its location.
 
-## 6. Materials and section properties
+### 8.3 Deflection
 
-The app shall include a built-in section database with a source column or source metadata.
-The database may be stored in `01_data/` and loaded by `index.html`.
+- Euler-Bernoulli beam theory with constant EI: EI v″ = −M(x), where v is the downward deflection and M is in kip-in.
+- Integrate twice numerically (trapezoid rule on the grid above).
+  - **Simply supported:** v(0) = v(L) = 0.
+  - **Cantilever:** v(0) = v′(0) = 0.
+- Neglect shear deformation and self-weight (self-weight may be entered as a uniform load).
+- Report the maximum |v| and its location.
 
-### 6.1 Steel
+### 8.4 Checks
 
-- Provide W-shapes and their `Sx`, `Ix`, and modulus of elasticity.
-- Include a clearly labeled allowable bending stress or a documented method for deriving it.
-- Default to E = 29,000 ksi for the supplied W-shape examples.
-- Permit the user to select a built-in W-shape.
-
-### 6.2 Lumber
-
-- Provide common nominal lumber sizes and their actual bending-section properties.
-- Record `b`, `d`, `Sx`, `Ix`, `E`, and allowable bending stress for each entry.
-- Define whether allowable values are supplied directly or adjusted for design conditions.
-- Permit the user to select a built-in lumber size and species/grade preset.
-- Do not present nominal dimensions as actual section dimensions.
-
-### 6.3 Custom section option
-
-- Optional custom inputs shall include `Sx`, `Ix`, `E`, and allowable bending stress.
-- Every custom value shall be positive.
-- Custom values shall be treated as unverified and clearly labeled as user-entered.
-
-## 7. Calculations
-
-### 7.1 Statics
-
-- Calculate reactions using static equilibrium.
-- Verify \(\sum F_y = 0\) and \(\sum M = 0\).
-- The app shall be numerically stable for small spans and arbitrarily placed valid loads.
-
-### 7.2 Shear and moment
-
-- Determine shear and moment at load discontinuities, support reactions, load endpoints,
-  and critical points.
-- Include the beam's absolute maximum shear and moment.
-- For each diagram, plot values at enough points to show every linear or piecewise-linear
-  segment exactly where practicable.
-- Include the local maximum moment locations for sagging and hogging regions where
-  applicable.
-
-### 7.3 Deflection
-
-- Use the Euler-Bernoulli beam equation:
-  - \(EI y'' = M\), with a constant \(E I\).
-- Neglect self-weight unless it is entered explicitly by the user.
-- Neglect shear deformation.
-- Apply support conditions for simply supported and cantilever beams.
-- Report maximum absolute deflection and its position.
-- Deflection calculations shall support point loads and uniform-load segments.
-- Mixed loads shall be combined for the deflection solution.
-- Plot the deflected shape relative to the undeformed beam centerline.
-
-### 7.4 Bending stress
-
-- Calculate maximum bending stress as:
-  - \(f_b = |M_{max}| / S_x\).
-- Compare the maximum bending stress with the selected allowable bending stress:
-  - Pass when \(f_b <= F_b\).
-  - Fail when \(f_b > F_b\).
-- Report \(f_b\), \(F_b\), and the utilization ratio \(f_b / F_b\).
-
-### 7.5 Deflection limit
-
-- Compare maximum absolute deflection with \(L / 360\), using L in inches.
-- Pass when \(|delta_max| <= L / 360\).
-- Fail when \(|delta_max| > L / 360\).
-- Report maximum deflection, its position, the allowable deflection, and the utilization
-  ratio.
-
-## 8. Validation
-
-### 8.1 Required benchmark
-
-For a 20 ft simply supported beam with a uniform load of 1 kip/ft:
-
-- W12x26 properties shall be Sx = 33.4 in3, Ix = 204 in4, E = 29,000 ksi.
-- Maximum moment shall be 50.0 kip-ft.
-- Maximum deflection shall be approximately 0.609 in.
-- Bending stress shall be approximately 17.96 ksi.
-- Deflection limit shall be 0.667 in.
-- The result shall pass both bending and deflection checks.
-
-### 8.2 Additional test cases
-
-The app shall be checked against or include visible hand-calculation test cases for:
-
-- A simply supported beam with one centered point load.
-- A simply supported beam with an off-center point load.
-- A cantilever with an end point load.
-- A cantilever with a uniformly distributed load over the full length.
-- Superposition of one point load and one uniform-load segment.
-- A simply supported beam with an unladen segment.
-- Minimum and maximum allowed span values.
-- Invalid support, load, coordinate, section, and material inputs.
-
-For each test case, record assumptions, equations, expected values, and actual app output
-in `02_validation/`.
+- **Bending stress:** f<sub>b</sub> = |M<sub>max</sub>| × 12 / S<sub>x</sub> (ksi). PASS if f<sub>b</sub> ≤ F<sub>b</sub>. Report f<sub>b</sub>, F<sub>b</sub>, and the ratio f<sub>b</sub>/F<sub>b</sub>.
+- **Deflection:** Δ<sub>allow</sub> = 12L / n for the chosen limit L/n (in). PASS if |v|<sub>max</sub> ≤ Δ<sub>allow</sub>. Report both values and the ratio.
 
 ## 9. Outputs
 
-### 9.1 Beam and loading diagram
+- **Results panel:**
+  - reactions (and the fixed-end moment for a cantilever), with the ΣF<sub>y</sub> check
+  - max shear and max moment
+  - f<sub>b</sub>, max deflection, and Δ<sub>allow</sub>
+  - separate PASS/FAIL labels for bending and deflection, shown in words and color, not color alone
+- **Diagrams:** an embedded matplotlib figure with four stacked panels sharing the x axis (ft):
+  1. **Beam and loads:** the beam line, support symbols (pin, roller, fixed), point-load arrows with values, and uniform-load blocks with values.
+  2. **Shear V** (kip).
+  3. **Moment M** (kip-ft).
+  4. **Deflection** (in; downward is plotted down).
 
-- Draw the beam as a horizontal member.
-- Show support symbols for pinned, roller, and fixed supports.
-- Display point loads with arrows and magnitudes.
-- Display uniform loads with endpoints and magnitudes.
-- Scale the diagram to the beam span.
-- Label dimensions and units.
-
-### 9.2 Diagrams
-
-- Display shear, moment, and deflection diagrams with a stable, responsive SVG or canvas.
-- Label axes and units.
-- Mark key values and critical locations.
-- Plot positive directions consistently with the sign conventions.
-- Keep the zero line visible.
-
-### 9.3 Summary
-
-- Display reactions, maximum shear, maximum moment, maximum bending stress, maximum
-  deflection, allowable bending stress, and allowable deflection.
-- Display separate pass/fail indicators for bending and deflection.
-- Display a missing/invalid input state instead of stale or contradictory results.
+  Each panel has a zero line and labeled maximum values.
+- **Invalid input:** the diagrams and results clear, and a banner says what to fix. Stale results are never shown.
 
 ## 10. Look and feel
 
-- Clean, modern, and professional.
-- Responsive from desktop through mobile widths.
-- Use clear typography and restrained engineering colors.
-- Use a neutral or light application background.
-- Use accessible color contrast and do not communicate pass/fail by color alone.
-- Add accessible labels to inputs and diagrams.
-- Include text alternatives or values for plotted critical results.
+- One resizable window, about 1280 × 800. Inputs are on the left in labeled groups (Beam, Section, Loads); the results and diagrams are on the right.
+- Restrained engineering colors (navy and blue, with orange accents, on a light background); every field is labeled with its units.
+- The window opens with the example beam already calculated: a 20 ft W12 × 26 with 1 kip/ft over the full span plus 5 kip at 12 ft.
 
 ## 11. Error handling
 
-- Highlight invalid fields and provide a concise explanation next to each invalid field.
-- Do not calculate or draw results while required inputs are invalid.
-- Prevent NaN, Infinity, stale values, and overlapping zero-length ranges.
-- For cantilever equilibrium, verify the fixed reaction and reaction moment.
-- For unsupported configurations or failed convergence, display a clear error instead of
-  a success-shaped fallback.
+- Highlight each invalid field and explain why; do not calculate while any input is invalid.
+- Never display NaN or Infinity.
+- Reject zero-length or reversed uniform-load ranges.
+- For any unsupported configuration, show a clear error instead of a result that looks valid.
 
-## 12. Project organization
+## 12. Validation
 
-- `index.html` is the complete app and GitHub Pages entry point.
-- `spec.md` documents the product and engineering requirements.
-- `prompts.md` records request history.
-- `00_planning/` contains notes and sketches.
-- `01_data/` contains section and material data.
-- `02_validation/` contains hand calculations and test cases.
-- `03_output/` contains screenshots and exported results.
-- Supporting app files are not created; the implementation shall remain in `index.html`.
+All cases use W12 × 26 (S<sub>x</sub> = 33.4 in³, I<sub>x</sub> = 204 in⁴, E = 29,000 ksi, F<sub>b</sub> = 24 ksi) and L/360 unless noted. Expected values were worked by hand from the standard beam formulas (AISC Manual, Table 3-23).
+
+| # | Case | Expected |
+|---|---|---|
+| 1 | Simply supported, L = 20 ft, w = 1 kip/ft over the full span (required benchmark) | R<sub>L</sub> = R<sub>R</sub> = 10.00 kip; M<sub>max</sub> = wL²/8 = 50.00 kip-ft at 10.0 ft; Δ = 5wL⁴/384EI = 0.609 in; f<sub>b</sub> = 17.96 ksi; Δ<sub>allow</sub> = 0.667 in; bending PASS, deflection PASS |
+| 2 | Simply supported, L = 20 ft, P = 10 kip at 10 ft | R = 5.00 kip each; M<sub>max</sub> = PL/4 = 50.00 kip-ft; Δ = PL³/48EI = 0.487 in at 10.0 ft |
+| 3 | Simply supported, L = 20 ft, P = 10 kip at 5 ft | R<sub>L</sub> = 7.50, R<sub>R</sub> = 2.50 kip; M<sub>max</sub> = Pab/L = 37.50 kip-ft at 5.0 ft; Δ = Pb(L² − b²)<sup>3/2</sup>/(9√3 L EI) = 0.325 in at 7.64 ft |
+| 4 | Cantilever, L = 10 ft, P = 5 kip at 10 ft | R = 5.00 kip; M<sub>fixed</sub> = −50.00 kip-ft; Δ = PL³/3EI = 0.487 in at 10.0 ft |
+| 5 | Cantilever, L = 10 ft, w = 1 kip/ft over the full span | R = 10.00 kip; M<sub>fixed</sub> = −50.00 kip-ft; Δ = wL⁴/8EI = 0.365 in at 10.0 ft |
+| 6 | Superposition: the loads of cases 1 and 2 together | M<sub>max</sub> = 100.00 kip-ft; Δ = 0.609 + 0.487 = 1.095 in; f<sub>b</sub> = 35.93 ksi; bending FAIL, deflection FAIL |
+| 7 | Simply supported, L = 20 ft, w = 2 kip/ft from 0 to 10 ft (unladen segment) | R<sub>L</sub> = 15.00, R<sub>R</sub> = 5.00 kip; M<sub>max</sub> = R<sub>L</sub>²/2w = 56.25 kip-ft at 7.5 ft |
+| 8 | Property check: symmetry and proportionality | Case 1 gives R<sub>L</sub> = R<sub>R</sub> and v(x) = v(L − x); doubling every load in case 3 doubles every reaction, M<sub>max</sub>, and Δ (ratio 2.000) |
+| 9 | Span limits | L = 100 ft calculates; L = 0 and L = 101 are rejected |
+| 10 | Invalid inputs | No loads; a point load at 25 ft on a 20 ft span; uniform start ≥ end; custom I<sub>x</sub> ≤ 0; a non-numeric span. Each is rejected with a message, and no results are shown |
 
 ## 13. Out of scope
 
-- Continuous beams.
+- Continuous beams and other support types.
 - Buckling and lateral-torsional stability.
 - Shear strength and shear stress checks.
-- Torsion.
-- Beam self-weight unless explicitly entered as a uniform load.
-- Deflection due to support settlement.
+- Torsion and axial load.
+- Self-weight unless it is entered as a uniform load.
+- Support settlement.
 - Dynamic, fatigue, creep, or nonlinear material behavior.
-- Axial loading.
-- Live-load redistribution or load-duration adjustments.
+- Load combinations and lumber adjustment factors.
+- Saving designs.
