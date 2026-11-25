@@ -144,7 +144,7 @@ All cases use W12 × 26 (S<sub>x</sub> = 33.4 in³, I<sub>x</sub> = 204 in⁴, E
 |---|---|---|
 | 1 | Simply supported, L = 20 ft, w = 1 kip/ft over the full span (required benchmark) | R<sub>L</sub> = R<sub>R</sub> = 10.00 kip; M<sub>max</sub> = wL²/8 = 50.00 kip-ft at 10.0 ft; Δ = 5wL⁴/384EI = 0.609 in; f<sub>b</sub> = 17.96 ksi; Δ<sub>allow</sub> = 0.667 in; bending PASS, deflection PASS |
 | 2 | Simply supported, L = 20 ft, P = 10 kip at 10 ft | R = 5.00 kip each; M<sub>max</sub> = PL/4 = 50.00 kip-ft; Δ = PL³/48EI = 0.487 in at 10.0 ft |
-| 3 | Simply supported, L = 20 ft, P = 10 kip at 5 ft | R<sub>L</sub> = 7.50, R<sub>R</sub> = 2.50 kip; M<sub>max</sub> = Pab/L = 37.50 kip-ft at 5.0 ft; Δ = Pb(L² − b²)<sup>3/2</sup>/(9√3 L EI) = 0.325 in at 7.64 ft |
+| 3 | Simply supported, L = 20 ft, P = 10 kip at a = 5 ft (b = 15 ft) | R<sub>L</sub> = 7.50, R<sub>R</sub> = 2.50 kip; M<sub>max</sub> = Pab/L = 37.50 kip-ft at 5.0 ft; Δ = Pc(L² − c²)<sup>3/2</sup>/(9√3 L EI), with c the *shorter* distance (5 ft) = 0.340 in, at √((L² − c²)/3) = 11.18 ft from the right end = 8.82 ft from the left. *(Corrected; see 12.1.)* |
 | 4 | Cantilever, L = 10 ft, P = 5 kip at 10 ft | R = 5.00 kip; M<sub>fixed</sub> = −50.00 kip-ft; Δ = PL³/3EI = 0.487 in at 10.0 ft |
 | 5 | Cantilever, L = 10 ft, w = 1 kip/ft over the full span | R = 10.00 kip; M<sub>fixed</sub> = −50.00 kip-ft; Δ = wL⁴/8EI = 0.365 in at 10.0 ft |
 | 6 | Superposition: the loads of cases 1 and 2 together | M<sub>max</sub> = 100.00 kip-ft; Δ = 0.609 + 0.487 = 1.095 in; f<sub>b</sub> = 35.93 ksi; bending FAIL, deflection FAIL |
@@ -152,6 +152,73 @@ All cases use W12 × 26 (S<sub>x</sub> = 33.4 in³, I<sub>x</sub> = 204 in⁴, E
 | 8 | Property check: symmetry and proportionality | Case 1 gives R<sub>L</sub> = R<sub>R</sub> and v(x) = v(L − x); doubling every load in case 3 doubles every reaction, M<sub>max</sub>, and Δ (ratio 2.000) |
 | 9 | Span limits | L = 100 ft calculates; L = 0 and L = 101 are rejected |
 | 10 | Invalid inputs | No loads; a point load at 25 ft on a 20 ft span; uniform start ≥ end; custom I<sub>x</sub> ≤ 0; a non-numeric span. Each is rejected with a message, and no results are shown |
+
+### 12.1 Validation results
+
+The agent ran `python validate.py` on 2026-11-24; it checks the app's calculation functions (the same ones the window uses) against the expected values above, at the number of decimal places given.
+
+**Case 3 correction.** The first run disagreed with the spec: the app gave 0.340 in at 8.82 ft, but the spec expected 0.325 in at 7.64 ft. Checking the work showed the *expected value* was wrong. The formula Δ<sub>max</sub> = Pc(L² − c²)<sup>3/2</sup>/(9√3 L EI) requires c to be the *shorter* of the two distances from the load to the supports, and the spec had used b = 15 ft instead of 5 ft. Redone with c = 5 ft = 60 in, L = 240 in, EI = 29,000 × 204 = 5,916,000 kip-in²:
+
+- Δ<sub>max</sub> = 10 × 60 × (240² − 60²)<sup>1.5</sup> / (9√3 × 240 × 5,916,000) = 600 × 54,000<sup>1.5</sup> / 2.2133 × 10<sup>10</sup> = **0.340 in**.
+- Location: √((240² − 60²)/3) = 134.2 in = 11.18 ft from the right support, so x = **8.82 ft**.
+- Cross-check with AISC Table 3-23 case 8 (a > b form, mirrored): Pab(a + 2b)√(3a(a + 2b)) / (27 EI L) = 0.340 in. The app was right, and the spec was corrected.
+
+| Case | Quantity | Expected | Actual | Result |
+|---|---|---|---|---|
+| 1 | R_L (kip) | 10.00 | 10.00 | PASS |
+| 1 | R_R (kip) | 10.00 | 10.00 | PASS |
+| 1 | M_max (kip-ft) | 50.00 | 50.00 | PASS |
+| 1 | M_max location (ft) | 10.0 | 10.0 | PASS |
+| 1 | Δ_max (in) | 0.609 | 0.609 | PASS |
+| 1 | f_b (ksi) | 17.96 | 17.96 | PASS |
+| 1 | Δ_allow L/360 (in) | 0.667 | 0.667 | PASS |
+| 1 | Bending check | PASS | PASS | PASS |
+| 1 | Deflection check | PASS | PASS | PASS |
+| 2 | R_L = R_R (kip) | 5.00 | 5.00 | PASS |
+| 2 | M_max (kip-ft) | 50.00 | 50.00 | PASS |
+| 2 | Δ_max (in) | 0.487 | 0.487 | PASS |
+| 2 | Δ_max location (ft) | 10.0 | 10.0 | PASS |
+| 3 | R_L (kip) | 7.50 | 7.50 | PASS |
+| 3 | R_R (kip) | 2.50 | 2.50 | PASS |
+| 3 | M_max (kip-ft) | 37.50 | 37.50 | PASS |
+| 3 | M_max location (ft) | 5.0 | 5.0 | PASS |
+| 3 | Δ_max (in) | 0.340 | 0.340 | PASS |
+| 3 | Δ_max location (ft) | 8.82 | 8.82 | PASS |
+| 4 | R (kip) | 5.00 | 5.00 | PASS |
+| 4 | M_fixed (kip-ft) | -50.00 | -50.00 | PASS |
+| 4 | Δ_max (in) | 0.487 | 0.487 | PASS |
+| 4 | Δ_max location (ft) | 10.0 | 10.0 | PASS |
+| 5 | R (kip) | 10.00 | 10.00 | PASS |
+| 5 | M_fixed (kip-ft) | -50.00 | -50.00 | PASS |
+| 5 | Δ_max (in) | 0.365 | 0.365 | PASS |
+| 5 | Δ_max location (ft) | 10.0 | 10.0 | PASS |
+| 6 | M_max (kip-ft) | 100.00 | 100.00 | PASS |
+| 6 | Δ_max (in) | 1.095 | 1.095 | PASS |
+| 6 | f_b (ksi) | 35.93 | 35.93 | PASS |
+| 6 | Bending check | FAIL | FAIL | PASS |
+| 6 | Deflection check | FAIL | FAIL | PASS |
+| 7 | R_L (kip) | 15.00 | 15.00 | PASS |
+| 7 | R_R (kip) | 5.00 | 5.00 | PASS |
+| 7 | M_max (kip-ft) | 56.25 | 56.25 | PASS |
+| 7 | M_max location (ft) | 7.5 | 7.5 | PASS |
+| 8 | Symmetry: R_L − R_R, case 1 (kip) | 0.000 | 0.000 | PASS |
+| 8 | Symmetry: largest difference v(x) − v(L−x), case 1 (in) | 0.000 | 0.000 | PASS |
+| 8 | Proportionality: R_L(2P) / R_L(P), case 3 | 2.000 | 2.000 | PASS |
+| 8 | Proportionality: R_R(2P) / R_R(P), case 3 | 2.000 | 2.000 | PASS |
+| 8 | Proportionality: M_max(2P) / M_max(P), case 3 | 2.000 | 2.000 | PASS |
+| 8 | Proportionality: Δ_max(2P) / Δ_max(P), case 3 | 2.000 | 2.000 | PASS |
+| 9 | L = 100 ft calculates | calculates | calculates | PASS |
+| 9 | L = 0 ft rejected | rejected | rejected: Span must be greater than zero. | PASS |
+| 9 | L = 101 ft rejected | rejected | rejected: Span must not exceed 100 ft. | PASS |
+| 10 | No loads | rejected with message | rejected: Add at least one load. | PASS |
+| 10 | Point load at 25 ft on 20 ft span | rejected with message | rejected: Point load 1 position must be between 0 and 20 ft. | PASS |
+| 10 | Uniform start ≥ end | rejected with message | rejected: Uniform load 1 end must be greater than its start. | PASS |
+| 10 | Custom Ix ≤ 0 | rejected with message | rejected: Moment of inertia Ix must be greater than zero. | PASS |
+| 10 | Non-numeric span | rejected with message | rejected: Span must be a number. | PASS |
+
+50/50 checks passed
+
+**My check in the app:** I entered case 1 (simply supported, 20 ft, W12 × 26, 1 kip/ft from 0 to 20 ft, no point load) and saw: R = ____ / ____ kip, M<sub>max</sub> = ____ kip-ft, f<sub>b</sub> = ____ ksi, Δ = ____ in, bending ____, deflection ____. *(fill in)*
 
 ## 13. Out of scope
 
