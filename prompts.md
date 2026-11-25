@@ -32,3 +32,19 @@
 - **Asked:** Add an Export results button that saves a table of x, V, M, and deflection along the beam to a CSV file that opens in Excel. Then rerun the validation cases.
 - **Changed:** Added spec section 14.2. Added an Output group with an "Export results (CSV)…" button, also in the File menu. `results_table` evaluates V and M exactly at every 1/200 of the span, every load position, load endpoint, and support, and every V = 0 point, with two rows at each point load (V just left and just right). Deflection is interpolated from the 2,000-interval solution. Written UTF-8 with BOM so Excel reads the units. The button disables while inputs are invalid.
 - **Result:** Works. For the example beam the CSV has 202 rows; its largest M is 72.00 kip-ft at 12 ft, matching the app, and the shear jump at the 5 kip load shows as 0.00 → −5.00 kip. Validation reran: 50/50 pass.
+
+- **Asked:** Add a Calculation sheet button that saves the diagrams and checks as a PDF, with the inputs listed at the top, ready to hand in with a design. Iterate on the layout. Then rerun the validation cases.
+- **Changed:** Added spec section 14.3. Refactored the diagram code into `draw_panels(axes, res, fs)` so the window and the PDF share it. Added `make_calc_sheet`, which writes a one-page letter PDF with matplotlib's PdfPages:
+  - a header with the date, the design file name, and Project/By/Checked blanks
+  - 1. Inputs, with the section source and load tables
+  - 2. Results and checks, with the f<sub>b</sub> and deflection equations written out and boxed PASS/FAIL
+  - 3. Diagrams
+  - a footer with sign conventions, the method, and what is not checked
+
+  Added a "Calculation sheet (PDF)…" button and File-menu item; both disable while inputs are invalid. Layout iterations after viewing the PDF:
+  - (1) Max-value labels hit the plot borders, so each panel's y-range now pads 38% around the data and zero.
+  - (2) The x-axis label ran into the footer line, so the diagrams' bottom moved up.
+  - (3) The right reaction label ran past the margin, so the plots moved in from the right edge.
+  - (4) The gap above section 3 was reduced.
+  - (5) The "limit L/360" label sat on the cantilever's deflection curve, so it moved to the left end, in the app too.
+- **Result:** Works. Sheets checked for the example beam (bending and deflection both FAIL) and for a W18×35 cantilever with two point loads plus a uniform load (bending PASS at 0.938, deflection FAIL at 1.071). That cantilever's tip deflection of 0.357 in matches superposition by hand (0.195 + 0.146 + 0.016). Validation reran: 50/50 pass.

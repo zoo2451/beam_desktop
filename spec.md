@@ -253,3 +253,15 @@ The agent ran `python validate.py` on 2026-11-24; it checks the app's calculatio
 - At a point load, x appears twice: first with V just left of the load, then just right of it, so the shear jump is visible.
 - V and M are exact at each x; the deflection is interpolated from the 2,000-interval solution.
 - The button is disabled, and the menu item shows a message, while inputs are invalid.
+
+### 14.3 Calculation sheet (PDF)
+- A **Calculation sheet (PDF)…** button (also in the File menu) saves a one-page, letter-size (8.5 × 11 in) PDF that is ready to hand in with a design. It is made with matplotlib's PDF backend; no extra packages are needed.
+- **Header:** title, design file name, date, and blank "Project", "By", and "Checked" lines.
+- **Inputs at the top:** beam type, span, section and its source, S<sub>x</sub>, I<sub>x</sub>, E, F<sub>b</sub>, the deflection limit, and tables of the point and uniform loads.
+- **Results and checks:**
+  - reactions (and fixed-end moment) with ΣF<sub>y</sub>
+  - max V and max M with their locations
+  - the bending check, written out as f<sub>b</sub> = |M<sub>max</sub>|·12/S<sub>x</sub>, and the deflection check against L/n, each with its numbers, ratio, and a boxed PASS/FAIL
+- **Diagrams:** the same beam/loads, shear, moment, and deflection panels as the app.
+- **Footer:** sign conventions, method (Euler-Bernoulli, constant EI), and the out-of-scope items (no shear, buckling, or self-weight unless entered).
+- Disabled while inputs are invalid.

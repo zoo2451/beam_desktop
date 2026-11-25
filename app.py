@@ -266,73 +266,79 @@ def draw_diagrams(fig, res):
     """Draw the beam/loads, shear, moment, and deflection panels into fig (spec 9)."""
     fig.clear()
     axes = fig.subplots(4, 1, sharex=True, gridspec_kw=dict(height_ratios=[1.1, 1, 1, 1]))
-    model = res["model"]
-    L = model["span"]
-    fig._beam_span = L
-    _draw_beam(axes[0], model, res)
-
-    ax = axes[1]
-    ax.fill_between(res["xs"], res["Vs"], color=BLUE, alpha=0.18, lw=0)
-    ax.plot(res["xs"], res["Vs"], color=BLUE, lw=1.6)
-    _mark(ax, res["max_shear_x"], res["max_shear"], f"{res['max_shear']:.2f} kip")
-    ax.set_ylabel("V (kip)")
-    ax.set_title("Shear  (positive = net upward force left of section)", fontsize=9, loc="left")
-
-    ax = axes[2]
-    ax.fill_between(res["x"], res["M"], color=ORANGE, alpha=0.18, lw=0)
-    ax.plot(res["x"], res["M"], color=ORANGE, lw=1.6)
-    _mark(ax, res["max_moment_x"], res["max_moment"], f"{res['max_moment']:.2f} kip-ft")
-    ax.set_ylabel("M (kip-ft)")
-    ax.set_title("Moment  (positive = sagging)", fontsize=9, loc="left")
-
-    ax = axes[3]
-    ax.plot(res["x"], -res["v"], color=NAVY, lw=1.8)  # downward deflection plotted down
-    ax.axhline(-res["allow_defl"], color=GRAY, ls=":", lw=1)
-    ax.text(L, -res["allow_defl"], f"  limit {model['limit']} = {res['allow_defl']:.3f} in",
-            fontsize=7, color=GRAY, va="bottom", ha="right")
-    i = int(np.argmax(np.abs(res["v"])))
-    _mark(ax, res["x"][i], -res["v"][i], f"{res['max_defl']:.3f} in")
-    ax.set_ylabel("Deflection (in)")
-    ax.set_title("Deflection  (downward plotted down)", fontsize=9, loc="left")
-    ax.set_xlabel("x from left end (ft)")
-    for a in axes[1:]:
-        a.axhline(0, color="#333", lw=0.8)
-        a.grid(alpha=0.25)
-        a.margins(y=0.25)
-        a.tick_params(labelsize=8)
-    axes[3].set_xlim(-0.04 * L, 1.04 * L)
+    draw_panels(axes, res)
     fig.tight_layout(h_pad=0.6)
     return axes
 
 
-def _mark(ax, x, y, text):
+def draw_panels(axes, res, fs=1.0):
+    """Fill four stacked axes (beam, V, M, deflection). fs scales the font sizes."""
+    model = res["model"]
+    L = model["span"]
+    _draw_beam(axes[0], model, res, fs)
+
+    ax = axes[1]
+    ax.fill_between(res["xs"], res["Vs"], color=BLUE, alpha=0.18, lw=0)
+    ax.plot(res["xs"], res["Vs"], color=BLUE, lw=1.6)
+    _mark(ax, L, res["max_shear_x"], res["max_shear"], f"{res['max_shear']:.2f} kip", fs)
+    ax.set_ylabel("V (kip)", fontsize=10 * fs)
+    ax.set_title("Shear  (positive = net upward force left of section)", fontsize=9 * fs, loc="left")
+
+    ax = axes[2]
+    ax.fill_between(res["x"], res["M"], color=ORANGE, alpha=0.18, lw=0)
+    ax.plot(res["x"], res["M"], color=ORANGE, lw=1.6)
+    _mark(ax, L, res["max_moment_x"], res["max_moment"], f"{res['max_moment']:.2f} kip-ft", fs)
+    ax.set_ylabel("M (kip-ft)", fontsize=10 * fs)
+    ax.set_title("Moment  (positive = sagging)", fontsize=9 * fs, loc="left")
+
+    ax = axes[3]
+    ax.plot(res["x"], -res["v"], color=NAVY, lw=1.8)  # downward deflection plotted down
+    ax.axhline(-res["allow_defl"], color=GRAY, ls=":", lw=1)
+    ax.text(0.01 * L, -res["allow_defl"], f"limit {model['limit']} = {res['allow_defl']:.3f} in",
+            fontsize=7 * fs, color=GRAY, va="top", ha="left")
+    i = int(np.argmax(np.abs(res["v"])))
+    _mark(ax, L, res["x"][i], -res["v"][i], f"{res['max_defl']:.3f} in", fs)
+    ax.set_ylabel("Deflection (in)", fontsize=10 * fs)
+    ax.set_title("Deflection  (downward plotted down)", fontsize=9 * fs, loc="left")
+    ax.set_xlabel("x from left end (ft)", fontsize=10 * fs)
+    for a in axes[1:]:
+        a.axhline(0, color="#333", lw=0.8)
+        a.grid(alpha=0.25)
+        lo, hi = a.dataLim.y0, a.dataLim.y1
+        lo, hi = min(lo, 0.0), max(hi, 0.0)
+        pad = 0.38 * (hi - lo or 1.0)  # room for the max-value labels inside the frame
+        a.set_ylim(lo - pad, hi + pad)
+        a.tick_params(labelsize=8 * fs)
+    axes[3].set_xlim(-0.04 * L, 1.04 * L)
+
+
+def _mark(ax, span, x, y, text, fs=1.0):
     """Dot and label at a maximum; label kept inside the plot near either end."""
     ax.plot([x], [y], "o", color="#222", ms=4)
-    span = ax.figure._beam_span
     right_side = x > 0.75 * span
     ax.annotate(text, (x, y), xytext=(-6 if right_side else 6, 6 if y >= 0 else -12),
                 textcoords="offset points", ha="right" if right_side else "left",
-                fontsize=8, fontweight="bold")
+                fontsize=8 * fs, fontweight="bold")
 
 
-def _draw_beam(ax, model, res):
+def _draw_beam(ax, model, res, fs=1.0):
     L = model["span"]
     h = 0.06 * L  # symbol size, scaled to the span
     ax.set_title(f"{model['beam_type']} beam, L = {L:g} ft, {model['section']['name']}",
-                 fontsize=9, loc="left")
+                 fontsize=9 * fs, loc="left")
     ax.plot([0, L], [0, 0], color=NAVY, lw=5, solid_capstyle="butt", zorder=3)
     if model["beam_type"] == SIMPLE:
         ax.add_patch(Polygon([[0, 0], [-h / 2, -h], [h / 2, -h]], color=GRAY))      # pin
         ax.add_patch(Polygon([[L, 0], [L - h / 2, -0.8 * h], [L + h / 2, -0.8 * h]], color=GRAY))
         ax.add_patch(Circle((L, -0.9 * h), 0.1 * h, color=GRAY))                     # roller
-        ax.text(0, -1.5 * h, f"R = {res['reactions']['left']:.2f} kip", ha="center", fontsize=7)
-        ax.text(L, -1.5 * h, f"R = {res['reactions']['right']:.2f} kip", ha="center", fontsize=7)
+        ax.text(0, -1.5 * h, f"R = {res['reactions']['left']:.2f} kip", ha="center", fontsize=7 * fs)
+        ax.text(L, -1.5 * h, f"R = {res['reactions']['right']:.2f} kip", ha="center", fontsize=7 * fs)
     else:
         ax.add_patch(Rectangle((-0.3 * h, -h), 0.3 * h, 2 * h, color=GRAY, hatch="////",
                                fill=False))
         ax.plot([0, 0], [-h, h], color=GRAY, lw=2)
         ax.text(0.02 * L, -1.5 * h, f"R = {res['reactions']['left']:.2f} kip, "
-                f"M = {res['reactions']['moment']:.2f} kip-ft", fontsize=7)
+                f"M = {res['reactions']['moment']:.2f} kip-ft", fontsize=7 * fs)
     # uniform loads: stacked blocks
     level = 0.15 * h
     for w, s, e in model["uniform_loads"]:
@@ -340,14 +346,14 @@ def _draw_beam(ax, model, res):
         for xa in np.linspace(s, e, max(2, int((e - s) / L * 16) + 1)):
             ax.annotate("", (xa, level), (xa, level + 0.6 * h),
                         arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=0.8, mutation_scale=6))
-        ax.text((s + e) / 2, level + 0.68 * h, f"{w:g} kip/ft", ha="center", fontsize=7,
+        ax.text((s + e) / 2, level + 0.68 * h, f"{w:g} kip/ft", ha="center", fontsize=7 * fs,
                 color=BLUE)
         level += 0.95 * h
     for P, a in model["point_loads"]:
         top = level + 0.9 * h
         ax.annotate("", (a, 0.08 * h), (a, top),
                     arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=1.6, mutation_scale=10))
-        ax.text(a, top + 0.08 * h, f"{P:g} kip", ha="center", fontsize=7, color=ORANGE)
+        ax.text(a, top + 0.08 * h, f"{P:g} kip", ha="center", fontsize=7 * fs, color=ORANGE)
     ax.set_ylim(-2.0 * h, level + 1.4 * h)
     ax.set_aspect("auto")
     ax.axis("off")
@@ -387,6 +393,7 @@ class BeamApp(tk.Tk):
         m.add_command(label="Save As…", accelerator="Ctrl+Shift+S", command=self.save_design_as)
         m.add_separator()
         m.add_command(label="Export results (CSV)…", command=self.export_csv)
+        m.add_command(label="Calculation sheet (PDF)…", command=self.export_pdf)
         m.add_separator()
         m.add_command(label="Quit", command=self.quit_app)
         bar.add_cascade(label="File", menu=m)
@@ -460,6 +467,22 @@ class BeamApp(tk.Tk):
     def _default_name(self, ext):
         stem = os.path.splitext(os.path.basename(self.path))[0] if self.path else "beam"
         return f"{stem}{ext}"
+
+    def export_pdf(self):
+        if self.result is None:
+            messagebox.showinfo(APP_TITLE, "Fix the highlighted inputs before making a "
+                                "calculation sheet.")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Save calculation sheet", defaultextension=".pdf",
+            filetypes=[("PDF", "*.pdf")], initialfile=self._default_name("_calc_sheet.pdf"))
+        if not path:
+            return
+        try:
+            make_calc_sheet(path, self.result,
+                            os.path.basename(self.path) if self.path else "Untitled (not saved)")
+        except OSError as exc:
+            messagebox.showerror(APP_TITLE, f"Could not write the PDF (is it open?)\n\n{exc}")
 
     def export_csv(self):
         if self.result is None:
@@ -552,9 +575,11 @@ class BeamApp(tk.Tk):
         g = ttk.LabelFrame(left, text="Output", padding=8, style="Group.TLabelframe")
         g.pack(fill="x", pady=(8, 0))
         self.output_buttons = []
-        b = ttk.Button(g, text="Export results (CSV)…", command=self.export_csv)
-        b.pack(side="left")
-        self.output_buttons.append(b)
+        for text, cmd in (("Export results (CSV)…", self.export_csv),
+                          ("Calculation sheet (PDF)…", self.export_pdf)):
+            b = ttk.Button(g, text=text, command=cmd)
+            b.pack(side="left", padx=(0, 6))
+            self.output_buttons.append(b)
 
     def _render_loads(self):
         for f in (self.point_frame, self.uniform_frame):
@@ -813,6 +838,153 @@ def write_results_csv(path, res):
         w.writerow(CSV_HEADER)
         for xi, vi, mi, di in results_table(res):
             w.writerow([f"{xi:.4f}", f"{vi:.4f}", f"{mi:.4f}", f"{di:.5f}"])
+
+
+# ------------------------------------------------ calc sheet (spec 14.3)
+def section_source(sec):
+    if sec["material"] == STEEL:
+        return "AISC Steel Construction Manual, Table 1-1"
+    if sec["material"] == LUMBER:
+        return "Actual dressed size; NDS Supplement reference values, no adjustment factors"
+    return "User-entered, unverified"
+
+
+def make_calc_sheet(path, res, design_name="Untitled", date_text=None):
+    """Write a one-page letter-size PDF calculation sheet (spec 14.3)."""
+    from datetime import date
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    model, R = res["model"], res["reactions"]
+    sec = model["section"]
+    L = model["span"]
+    fig = Figure(figsize=(8.5, 11))
+    T = fig.text
+    LM, RM = 0.07, 0.93  # page margins (figure fraction)
+    x2 = 0.56            # right column
+
+    def rule(y, lw=0.8, color=NAVY):
+        fig.add_artist(Rectangle((LM, y), RM - LM, 0.0008 * lw, transform=fig.transFigure,
+                                 color=color, lw=0))
+
+    def heading(y, text):
+        T(LM, y, text, fontsize=10.5, fontweight="bold", color=NAVY)
+        rule(y - 0.006, 0.6, "#c9d3e0")
+
+    def pairs(x, y, items, dy=0.0185, w=0.17, size=8.5):
+        for label, value in items:
+            T(x, y, label, fontsize=size, color="#444")
+            T(x + w, y, value, fontsize=size, color="#111")
+            y -= dy
+        return y
+
+    # header
+    T(LM, 0.962, "Beam Calculation Sheet", fontsize=17, fontweight="bold", color=NAVY)
+    T(RM, 0.966, date_text or f"{date.today():%Y-%m-%d}", fontsize=9, ha="right", color="#444")
+    T(RM, 0.951, f"Beam Designer  ·  design file: {design_name}", fontsize=8, ha="right",
+      color="#444")
+    T(LM, 0.931, "Project: ______________________________     By: ____________     "
+      "Checked: ____________", fontsize=8.5, color="#333")
+    rule(0.922, 1.6)
+
+    # 1. inputs
+    heading(0.898, "1. Inputs")
+    y0 = 0.873
+    pairs(LM, y0, [
+        ("Support", model["beam_type"]),
+        ("Span, L", f"{L:g} ft  ({L * 12:g} in)"),
+        ("Deflection limit", f"{model['limit']}"),
+        ("Section", f"{sec['name']}  ({sec['material']})"),
+        ("Sx / Ix", f"{sec['sx']:.4g} in³  /  {sec['ix']:.4g} in⁴"),
+        ("E / Fb (allowable)", f"{sec['e']:,.0f} ksi  /  {sec['fb']:g} ksi"),
+    ])
+    T(LM, y0 - 6 * 0.0185 - 0.002, f"Section data: {section_source(sec)}", fontsize=7,
+      color=GRAY, style="italic")
+
+    T(x2, y0, "Loads (downward positive)", fontsize=8.5, fontweight="bold", color="#333")
+    y = y0 - 0.019
+    cols = [x2, x2 + 0.05, x2 + 0.15, x2 + 0.25]
+    if model["point_loads"]:
+        for c, h in zip(cols, ("#", "P (kip)", "a (ft)")):
+            T(c, y, h, fontsize=7.5, color=GRAY)
+        y -= 0.016
+        for i, (P, a) in enumerate(model["point_loads"], 1):
+            for c, v in zip(cols, (f"P{i}", f"{P:g}", f"{a:g}")):
+                T(c, y, v, fontsize=8.5)
+            y -= 0.016
+        y -= 0.006
+    if model["uniform_loads"]:
+        for c, h in zip(cols, ("#", "w (kip/ft)", "start (ft)", "end (ft)")):
+            T(c, y, h, fontsize=7.5, color=GRAY)
+        y -= 0.016
+        for i, (w, s, e) in enumerate(model["uniform_loads"], 1):
+            for c, v in zip(cols, (f"w{i}", f"{w:g}", f"{s:g}", f"{e:g}")):
+                T(c, y, v, fontsize=8.5)
+            y -= 0.016
+    T(x2, y - 0.004, f"Total load W = {res['total_load']:.2f} kip", fontsize=8, color="#333")
+
+    # 2. results and checks
+    top2 = min(0.735, y - 0.035)
+    heading(top2, "2. Results and checks")
+    yr = top2 - 0.025
+    if model["beam_type"] == SIMPLE:
+        react = [("Reaction, left (x = 0)", f"{R['left']:.2f} kip"),
+                 (f"Reaction, right (x = {L:g} ft)", f"{R['right']:.2f} kip")]
+    else:
+        react = [("Fixed reaction (x = 0)", f"{R['left']:.2f} kip"),
+                 ("Fixed-end moment", f"{R['moment']:.2f} kip-ft")]
+    pairs(LM, yr, react + [
+        ("Equilibrium ΣFy", f"{res['equilibrium']:.3f} kip"),
+        ("Max shear |V|", f"{abs(res['max_shear']):.2f} kip at x = {res['max_shear_x']:.2f} ft"),
+        ("Max moment |M|", f"{abs(res['max_moment']):.2f} kip-ft at x = {res['max_moment_x']:.2f} ft"),
+        ("Max deflection", f"{res['max_defl']:.3f} in at x = {res['max_defl_x']:.2f} ft"),
+    ], w=0.2)
+
+    def check_box(y, title, lines, ok):
+        fig.add_artist(Rectangle((x2 - 0.01, y - 0.067), RM - x2 + 0.01, 0.083,
+                                 transform=fig.transFigure, fill=False, ec="#c9d3e0", lw=0.8))
+        T(x2, y, title, fontsize=8.5, fontweight="bold", color="#333")
+        for k, ln in enumerate(lines):
+            T(x2, y - 0.017 * (k + 1), ln, fontsize=8)
+        color = "#17795a" if ok else "#b42318"
+        T(RM - 0.012, y - 0.03, "PASS" if ok else "FAIL", fontsize=13, fontweight="bold",
+          color=color, ha="right", va="center",
+          bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=color, lw=1.4))
+
+    check_box(yr + 0.004, "Bending stress", [
+        f"fb = |Mmax|·12 / Sx = {abs(res['max_moment']):.2f}·12 / {sec['sx']:.4g}",
+        f"   = {res['fb']:.2f} ksi {'≤' if res['bending_pass'] else '>'} Fb = {res['Fb']:.2f} ksi",
+        f"fb / Fb = {res['fb_ratio']:.3f}"], res["bending_pass"])
+    check_box(yr - 0.088, "Deflection", [
+        f"Δallow = L/{model['limit_n']} = {L * 12:g} / {model['limit_n']} = {res['allow_defl']:.3f} in",
+        f"Δmax = {res['max_defl']:.3f} in {'≤' if res['defl_pass'] else '>'} Δallow",
+        f"Δmax / Δallow = {res['defl_ratio']:.3f}"], res["defl_pass"])
+
+    # 3. diagrams
+    top3 = yr - 0.165
+    heading(top3, "3. Load, shear, moment, and deflection diagrams")
+    gs = fig.add_gridspec(4, 1, left=LM + 0.06, right=RM - 0.03, top=top3 - 0.025, bottom=0.115,
+                          hspace=0.55, height_ratios=[1.15, 1, 1, 1])
+    axes = [fig.add_subplot(gs[0])]
+    axes += [fig.add_subplot(gs[k], sharex=axes[0]) for k in (1, 2, 3)]
+    draw_panels(axes, res, fs=0.85)
+    for a in axes[:3]:
+        a.tick_params(labelbottom=False)
+
+    # footer
+    rule(0.068, 0.6, "#c9d3e0")
+    T(LM, 0.052, "Sign conventions: x from left end; loads and deflection positive downward; "
+      "reactions positive upward; V = sum of forces left of section; M positive sagging.",
+      fontsize=6.8, color="#444")
+    T(LM, 0.039, "Method: statics; Euler-Bernoulli beam theory, EI v″ = −M, constant EI, "
+      "trapezoid integration on a 2,000-interval grid plus load breakpoints.", fontsize=6.8,
+      color="#444")
+    T(LM, 0.026, "Not checked: shear strength, lateral-torsional buckling, bearing, "
+      "load combinations, lumber adjustment factors. Self-weight only if entered as a load.",
+      fontsize=6.8, color="#444")
+    with PdfPages(path, metadata={"Title": f"Beam calculation sheet - {design_name}",
+                                  "Creator": APP_TITLE}) as pdf:
+        pdf.savefig(fig)
+    return fig
 
 
 # ------------------------------------------------- .beam files (spec 14.1)
