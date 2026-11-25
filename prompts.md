@@ -9,3 +9,14 @@
 - **Asked:** Update spec.md to describe a Python desktop app using Tkinter. Don't build anything.
 - **Changed:** Rewrote `spec.md` for a Tkinter + numpy + matplotlib desktop app started with `python app.py`: added a Platform section and an inputs table (adding a deflection-limit dropdown, L/180-L/480), and put the statics, shear/moment, deflection (EI v″ = −M), and check equations in writing. Replaced the web-only items (SVG, GitHub Pages, numbered folders, responsive layout) with desktop equivalents. Wrote 10 validation cases with expected values worked by hand from the AISC Table 3-23 formulas. Corrected the lumber data: the web app's 4×12 S and I did not match 3.5 × 11.25 in, and its F<sub>b</sub> = 1.5 ksi exceeded the NDS DF-L No. 2 value of 0.900 ksi. "Saving designs" stays in Out of scope for now.
 - **Result:** Succeeded. No code written.
+
+- **Asked:** Read spec.md and build the desktop app it describes, using index.html as a reference for how the app should behave.
+- **Changed:** Created `app.py`:
+  - Tkinter inputs on the left: beam type, span, deflection limit, material/section with S<sub>x</sub>/I<sub>x</sub>/E/F<sub>b</sub>, and point and uniform load rows with add/remove.
+  - Five result cards: reactions, max shear, max moment, and PASS/FAIL for bending and deflection.
+  - An embedded matplotlib figure with beam/loads, shear, moment, and deflection panels, plus the navigation toolbar.
+  - Calculations are Tk-free functions (`validate_inputs`, `reactions`, `shear_at`, `moment_at`, `analyze`) on a 2,000-interval grid plus load breakpoints and V = 0 crossings; deflection comes from double trapezoid integration of −M/EI.
+  - Invalid fields turn red, a banner lists each problem, and results and diagrams are hidden.
+  - While porting, three web-app steel entries failed the S<sub>x</sub> ≈ 2I<sub>x</sub>/d check (W10×12 S<sub>x</sub> 12.6 → 10.9, W10×22 26.0 → 23.2, W14×30 42.7/290 → 42.0/291) and were corrected to AISC values.
+  - First screenshots showed E as "2.9e+04", clipped text in the result cards, the max-shear label cut off at the right edge, and "≤ …?" wording on a failing check. All fixed.
+- **Result:** Works. The example beam, a cantilever with lumber, and an invalid-input state were all checked with screenshots. A quick run of the validation inputs matched every hand value except case 3 deflection (app 0.340 in at 8.82 ft vs. spec 0.325 in at 7.64 ft), which is investigated in the validation step.
