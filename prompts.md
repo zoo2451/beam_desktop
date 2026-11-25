@@ -52,3 +52,7 @@
 - **Asked:** Write a short README.md that says what this app does, which packages to install, and the command that starts it.
 - **Changed:** Added `README.md` (what the app does, `pip install numpy matplotlib`, `python app.py`, the Mac `python3` note, and `python validate.py`).
 - **Result:** Succeeded. Ready to publish to GitHub from VS Code (Publish Branch).
+
+- **Asked:** What do I need to do to turn this in on Learning Suite?
+- **Changed:** No code changes. Checked the repo: work is committed, but no GitHub remote is set yet. Listed the submission steps (publish to GitHub, zip the folder, upload, paste the repo URL).
+- **Result:** Answered; the user still has to publish the repo and upload the zip.
