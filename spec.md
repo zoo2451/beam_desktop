@@ -230,4 +230,15 @@ The agent ran `python validate.py` on 2026-11-24; it checks the app's calculatio
 - Support settlement.
 - Dynamic, fatigue, creep, or nonlinear material behavior.
 - Load combinations and lumber adjustment factors.
-- Saving designs.
+
+## 14. Desktop features
+
+### 14.1 Save and Open
+- A **File** menu with New (reset to the example beam), Open…, Save, Save As…, and Quit. Keyboard shortcuts: Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S.
+- A design is saved as a `.beam` file: JSON text holding the app name, a file-format version, and every input exactly as entered:
+  - support type, span, and deflection limit
+  - material and section, with S<sub>x</sub>, I<sub>x</sub>, E, and F<sub>b</sub>
+  - point loads (P, a) and uniform loads (w, start, end)
+- Opening a file restores every input and recalculates. A design with invalid inputs can still be saved and reopened, so work in progress is not lost.
+- The window title shows the file name, with `*` when there are unsaved changes. New, Open, and Quit ask before discarding unsaved changes.
+- A file that is not a valid `.beam` file shows an error, and the current design is kept.

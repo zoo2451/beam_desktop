@@ -4,9 +4,11 @@ Run with:  python app.py
 Requirements and validation cases are in spec.md.
 """
 
+import json
 import math
+import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -363,11 +365,93 @@ class BeamApp(tk.Tk):
         self.uniform_rows = []  # list of (w var, s var, e var)
         self._pending = None
         self.result = None
+        self.path = None        # file the design was opened from / saved to
+        self.dirty = False      # unsaved changes?
+        self._loading = False
         style = ttk.Style(self)
         style.configure("Group.TLabelframe.Label", font=("Segoe UI", 10, "bold"), foreground=NAVY)
+        self._build_menu()
         self._build_inputs()
         self._build_outputs()
         self.load_state(default_state())
+        self.protocol("WM_DELETE_WINDOW", self.quit_app)
+
+    # ------------------------------------------------- file menu (14.1)
+    def _build_menu(self):
+        bar = tk.Menu(self)
+        m = tk.Menu(bar, tearoff=False)
+        m.add_command(label="New", accelerator="Ctrl+N", command=self.new_design)
+        m.add_command(label="Open…", accelerator="Ctrl+O", command=self.open_design)
+        m.add_command(label="Save", accelerator="Ctrl+S", command=self.save_design)
+        m.add_command(label="Save As…", accelerator="Ctrl+Shift+S", command=self.save_design_as)
+        m.add_separator()
+        m.add_command(label="Quit", command=self.quit_app)
+        bar.add_cascade(label="File", menu=m)
+        self.file_menu = m
+        self.config(menu=bar)
+        self.bind_all("<Control-n>", lambda e: self.new_design())
+        self.bind_all("<Control-o>", lambda e: self.open_design())
+        self.bind_all("<Control-s>", lambda e: self.save_design())
+        self.bind_all("<Control-S>", lambda e: self.save_design_as())
+
+    def update_title(self):
+        name = os.path.basename(self.path) if self.path else "Untitled"
+        self.title(f"{'*' if self.dirty else ''}{name} - {APP_TITLE}")
+
+    def confirm_discard(self):
+        if not self.dirty:
+            return True
+        ans = messagebox.askyesnocancel(APP_TITLE, "Save changes to this design first?")
+        if ans is None:
+            return False
+        return self.save_design() if ans else True
+
+    def new_design(self):
+        if self.confirm_discard():
+            self.path = None
+            self.load_state(default_state())
+
+    def open_design(self):
+        if not self.confirm_discard():
+            return
+        path = filedialog.askopenfilename(title="Open beam design", filetypes=BEAM_FILETYPES)
+        if not path:
+            return
+        try:
+            with open(path, encoding="utf-8") as fh:
+                state = design_from_json(json.load(fh))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            messagebox.showerror(APP_TITLE, f"Could not open this file; the current design "
+                                 f"is unchanged.\n\n{exc}")
+            return
+        self.path = path
+        self.load_state(state)
+
+    def save_design(self):
+        if not self.path:
+            return self.save_design_as()
+        try:
+            with open(self.path, "w", encoding="utf-8") as fh:
+                json.dump(design_to_json(self.collect_raw()), fh, indent=2, ensure_ascii=False)
+        except OSError as exc:
+            messagebox.showerror(APP_TITLE, f"Could not save the design:\n{exc}")
+            return False
+        self.dirty = False
+        self.update_title()
+        return True
+
+    def save_design_as(self):
+        path = filedialog.asksaveasfilename(
+            title="Save beam design", defaultextension=".beam", filetypes=BEAM_FILETYPES,
+            initialfile=os.path.basename(self.path) if self.path else "beam_design.beam")
+        if not path:
+            return False
+        self.path = path
+        return self.save_design()
+
+    def quit_app(self):
+        if self.confirm_discard():
+            self.destroy()
 
     # ----------------------------------------------------------- inputs
     def _entry(self, parent, var, width=9):
@@ -561,6 +645,9 @@ class BeamApp(tk.Tk):
 
     # ------------------------------------------------------ recalculation
     def schedule(self):
+        if not self._loading and not self.dirty:
+            self.dirty = True
+            self.update_title()
         if self._pending:
             self.after_cancel(self._pending)
         self._pending = self.after(150, self.recalculate)
@@ -624,11 +711,17 @@ class BeamApp(tk.Tk):
             self.out[key][1].configure(text=txt)
 
     # ------------------------------------------------------------- state
-    def get_state(self):
-        raw = self.collect_raw()
-        return raw
-
     def load_state(self, st):
+        """Put a design (dict of input strings, as from collect_raw) into the window."""
+        self._loading = True
+        try:
+            self._load_state(st)
+        finally:
+            self._loading = False
+        self.dirty = False
+        self.update_title()
+
+    def _load_state(self, st):
         self.beam_type.set(st["beam_type"])
         self.span.set(st["span"])
         self.limit.set(st["limit"])
@@ -653,6 +746,43 @@ def default_state():
     return dict(beam_type=SIMPLE, span="20", limit="L/360", material=STEEL, section="W12 × 26",
                 sx="", ix="", e="", fb="24", point_loads=[("5", "12")],
                 uniform_loads=[("1", "0", "20")])
+
+
+# ------------------------------------------------- .beam files (spec 14.1)
+BEAM_FILETYPES = [("Beam design", "*.beam"), ("All files", "*.*")]
+FILE_VERSION = 1
+STATE_KEYS = ("beam_type", "span", "limit", "material", "section", "sx", "ix", "e", "fb")
+
+
+def design_to_json(raw):
+    """Inputs exactly as entered (strings), plus a header identifying the file."""
+    return {"app": APP_TITLE, "version": FILE_VERSION,
+            **{k: str(raw.get(k, "")) for k in STATE_KEYS},
+            "point_loads": [{"P_kip": p, "a_ft": a} for p, a in raw["point_loads"]],
+            "uniform_loads": [{"w_kip_per_ft": w, "start_ft": s, "end_ft": e}
+                              for w, s, e in raw["uniform_loads"]]}
+
+
+def design_from_json(d):
+    """Inverse of design_to_json; raises ValueError/KeyError/TypeError for a bad file."""
+    if not isinstance(d, dict) or d.get("app") != APP_TITLE:
+        raise ValueError("This is not a Beam Designer file.")
+    if d.get("version") != FILE_VERSION:
+        raise ValueError(f"Unsupported file version: {d.get('version')!r}.")
+    st = {k: str(d[k]) for k in STATE_KEYS}
+    if st["beam_type"] not in (SIMPLE, CANTILEVER):
+        raise ValueError(f"Unknown beam type {st['beam_type']!r}.")
+    if st["material"] not in (STEEL, LUMBER, CUSTOM):
+        raise ValueError(f"Unknown material {st['material']!r}.")
+    if st["limit"] not in LIMITS:
+        raise ValueError(f"Unknown deflection limit {st['limit']!r}.")
+    table = STEEL_SHAPES if st["material"] == STEEL else LUMBER_SHAPES
+    if st["material"] != CUSTOM and st["section"] not in table:
+        raise ValueError(f"Unknown section {st['section']!r}.")
+    st["point_loads"] = [(str(p["P_kip"]), str(p["a_ft"])) for p in d["point_loads"]]
+    st["uniform_loads"] = [(str(u["w_kip_per_ft"]), str(u["start_ft"]), str(u["end_ft"]))
+                           for u in d["uniform_loads"]]
+    return st
 
 
 def _safe_float(text, default):
