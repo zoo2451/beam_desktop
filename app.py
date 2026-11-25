@@ -4,6 +4,7 @@ Run with:  python app.py
 Requirements and validation cases are in spec.md.
 """
 
+import csv
 import json
 import math
 import os
@@ -385,6 +386,8 @@ class BeamApp(tk.Tk):
         m.add_command(label="Save", accelerator="Ctrl+S", command=self.save_design)
         m.add_command(label="Save As…", accelerator="Ctrl+Shift+S", command=self.save_design_as)
         m.add_separator()
+        m.add_command(label="Export results (CSV)…", command=self.export_csv)
+        m.add_separator()
         m.add_command(label="Quit", command=self.quit_app)
         bar.add_cascade(label="File", menu=m)
         self.file_menu = m
@@ -452,6 +455,26 @@ class BeamApp(tk.Tk):
     def quit_app(self):
         if self.confirm_discard():
             self.destroy()
+
+    # --------------------------------------------- export results (14.2)
+    def _default_name(self, ext):
+        stem = os.path.splitext(os.path.basename(self.path))[0] if self.path else "beam"
+        return f"{stem}{ext}"
+
+    def export_csv(self):
+        if self.result is None:
+            messagebox.showinfo(APP_TITLE, "Fix the highlighted inputs before exporting results.")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Export results", defaultextension=".csv",
+            filetypes=[("CSV (opens in Excel)", "*.csv")],
+            initialfile=self._default_name("_results.csv"))
+        if not path:
+            return
+        try:
+            write_results_csv(path, self.result)
+        except OSError as exc:  # e.g. the file is open in Excel
+            messagebox.showerror(APP_TITLE, f"Could not write the file (is it open in Excel?)\n\n{exc}")
 
     # ----------------------------------------------------------- inputs
     def _entry(self, parent, var, width=9):
@@ -525,6 +548,13 @@ class BeamApp(tk.Tk):
         self.uniform_frame.pack(fill="x")
         ttk.Button(g, text="+ Add uniform load", command=self.add_uniform).pack(anchor="w",
                                                                               pady=(4, 0))
+
+        g = ttk.LabelFrame(left, text="Output", padding=8, style="Group.TLabelframe")
+        g.pack(fill="x", pady=(8, 0))
+        self.output_buttons = []
+        b = ttk.Button(g, text="Export results (CSV)…", command=self.export_csv)
+        b.pack(side="left")
+        self.output_buttons.append(b)
 
     def _render_loads(self):
         for f in (self.point_frame, self.uniform_frame):
@@ -675,8 +705,12 @@ class BeamApp(tk.Tk):
                 small.configure(text="")
             self.fig.clear()
             self.canvas.draw_idle()
+            for b in self.output_buttons:
+                b.state(["disabled"])
             return
         self.banner.pack_forget()
+        for b in self.output_buttons:
+            b.state(["!disabled"])
         self.result = res = analyze(model)
         self.show_results(res)
         draw_diagrams(self.fig, res)
@@ -746,6 +780,39 @@ def default_state():
     return dict(beam_type=SIMPLE, span="20", limit="L/360", material=STEEL, section="W12 × 26",
                 sx="", ix="", e="", fb="24", point_loads=[("5", "12")],
                 uniform_loads=[("1", "0", "20")])
+
+
+# --------------------------------------------------- CSV export (spec 14.2)
+CSV_HEADER = ["x (ft)", "V (kip)", "M (kip-ft)", "deflection (in, down +)"]
+
+
+def results_table(res, intervals=200):
+    """Rows of (x, V, M, deflection) along the beam, per spec 14.2."""
+    model, R = res["model"], res["reactions"]
+    L = model["span"]
+    breaks = [0.0, L] + [a for _, a in model["point_loads"]]
+    breaks += [v for _, s, e in model["uniform_loads"] for v in (s, e)]
+    x = np.unique(np.concatenate([np.linspace(0, L, intervals + 1), breaks]))
+    # V = 0 points from the full solution's grid
+    zeros = res["x"][np.abs(shear_at(model, R, res["x"], "right")) < 1e-9]
+    x = np.unique(np.concatenate([x, zeros]))
+    Vl, Vr = shear_at(model, R, x, "left"), shear_at(model, R, x, "right")
+    M = moment_at(model, R, x)
+    v = np.interp(x, res["x"], res["v"])
+    rows = []
+    for xi, vli, vri, mi, di in zip(x, Vl, Vr, M, v):
+        if abs(vli - vri) > 1e-12 and xi > 0:
+            rows.append((xi, vli, mi, di))  # just left of a point load
+        rows.append((xi, vri, mi, di))
+    return rows
+
+
+def write_results_csv(path, res):
+    with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(CSV_HEADER)
+        for xi, vi, mi, di in results_table(res):
+            w.writerow([f"{xi:.4f}", f"{vi:.4f}", f"{mi:.4f}", f"{di:.5f}"])
 
 
 # ------------------------------------------------- .beam files (spec 14.1)

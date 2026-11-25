@@ -242,3 +242,14 @@ The agent ran `python validate.py` on 2026-11-24; it checks the app's calculatio
 - Opening a file restores every input and recalculates. A design with invalid inputs can still be saved and reopened, so work in progress is not lost.
 - The window title shows the file name, with `*` when there are unsaved changes. New, Open, and Quit ask before discarding unsaved changes.
 - A file that is not a valid `.beam` file shows an error, and the current design is kept.
+
+### 14.2 Export results
+- An **Export results (CSV)…** button (also in the File menu) saves a table along the beam to a `.csv` file that opens directly in Excel (UTF-8 with BOM, so the units show correctly).
+- Columns: `x (ft)`, `V (kip)`, `M (kip-ft)`, and `deflection (in, down +)`.
+- Rows:
+  - every 1/200 of the span
+  - every load position, load endpoint, and support
+  - every point where V = 0
+- At a point load, x appears twice: first with V just left of the load, then just right of it, so the shear jump is visible.
+- V and M are exact at each x; the deflection is interpolated from the 2,000-interval solution.
+- The button is disabled, and the menu item shows a message, while inputs are invalid.
